@@ -7,7 +7,6 @@ from app import seed
 from app.db import connect, immediate_tx
 from app.engines.fefo import consume_fefo, expire_lots
 from app.modules.quarantine import (
-from app.engines import isolate_leak
     ISOLATED_WHERE, POSITIVE_WHERE, clean_lot, is_isolated, preview_clean, reasons,
 )
 
@@ -29,7 +28,7 @@ def fridge(layer: str | None = None):
     """Positive zone only: dirty or non-positive lots stay in quarantine."""
     c = connect()
     q = f"""SELECT lots.*, items.name, items.layer, items.unit FROM lots
-           JOIN items ON items.id=lots.item_id WHERE {isolate_leak.fridge_where()}"""
+           JOIN items ON items.id=lots.item_id WHERE {POSITIVE_WHERE}"""
     args = []
     if layer:
         q += " AND items.layer=?"; args.append(layer)
@@ -43,7 +42,7 @@ def alerts():
     today = date.today().isoformat()
     rows = [dict(r) for r in c.execute(
         f"""SELECT lots.*, items.name, items.layer FROM lots JOIN items ON items.id=lots.item_id
-           WHERE {isolate_leak.alerts_where()}""")]
+           WHERE {POSITIVE_WHERE} AND expiry IS NOT NULL""")]
     c.close()
     out = []
     for r in rows:
@@ -81,7 +80,7 @@ class ConsumeIn(BaseModel):
 def consume(body: ConsumeIn):
     c = connect()
     lots = [dict(r) for r in c.execute(
-        f"SELECT * FROM lots WHERE item_id=? AND {isolate_leak.consume_where()}", (body.item_id,))]
+        f"SELECT * FROM lots WHERE item_id=? AND {POSITIVE_WHERE}", (body.item_id,))]
     result = consume_fefo(lots, body.qty)
     if not result["ok"] and result["reason"] == "qty_non_positive":
         c.close(); raise HTTPException(400, result["reason"])

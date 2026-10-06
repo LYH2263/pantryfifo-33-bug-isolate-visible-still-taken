@@ -1,6 +1,6 @@
 <template>
   <div>
-    <h1>设置 · 隔离仍进扣减</h1>
+    <h1>设置 · 隔离批不进扣减</h1>
     <pre>{{ s }}</pre>
   </div>
 </template>

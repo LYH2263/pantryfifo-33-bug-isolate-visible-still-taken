@@ -1,6 +1,6 @@
 <template>
   <div>
-    <h1>{{ props.layer }} 层 · 隔离仍进扣减</h1>
+    <h1>{{ props.layer }} 层 · 正区（脏批已隔离）</h1>
     <span v-for="x in rows" :key="x.id" class="lot">{{ x.name }} ×{{ x.qty_remain }} · {{ x.expiry }}</span>
   </div>
 </template>
