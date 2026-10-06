@@ -2,7 +2,7 @@
   <div>
     <h1>冰箱分层</h1>
     <p class="muted">
-      竖列分层 · FEFO 消费走「消费」页 · 隔离仍进扣减 · 此处为正区（脏批不在此列）
+      竖列分层 · FEFO 消费走「消费」页 · 扣减只走正区 · 此处为正区（脏批不在此列）
       <template v-if="store.quarantine">，<router-link to="/quarantine">隔离区 {{ store.quarantine }} 批待清洗</router-link></template>
     </p>
     <div class="fridge">

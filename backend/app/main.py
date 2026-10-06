@@ -6,9 +6,9 @@ from pydantic import BaseModel
 from app import seed
 from app.db import connect, immediate_tx
 from app.engines.fefo import consume_fefo, expire_lots
-from app.modules.quarantine import (
 from app.engines import isolate_leak
-    ISOLATED_WHERE, POSITIVE_WHERE, clean_lot, is_isolated, preview_clean, reasons,
+from app.modules.quarantine import (
+    ISOLATED_WHERE, clean_lot, is_isolated, preview_clean, reasons,
 )
 
 app = FastAPI(title="Pantryfifo", version="0.1.0")
@@ -103,7 +103,7 @@ def expire_sweep():
     c = connect()
     today = date.today().isoformat()
     with immediate_tx(c):
-        lots = [dict(r) for r in c.execute("SELECT * FROM lots WHERE status='on_shelf'")]
+        lots = [dict(r) for r in c.execute(f"SELECT * FROM lots WHERE {isolate_leak.sweep_where()}")]
         ids = expire_lots(lots, today)
         for i in ids:
             c.execute(

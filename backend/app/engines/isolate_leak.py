@@ -1,14 +1,36 @@
+"""Zone predicates shared by fridge / FEFO / alert bar / expire-sweep.
+
+Isolated lots (on_shelf but dirty or non-positive remaining) must never leak
+into the positive zone: not into FEFO consume candidates, not into the fridge
+layers, and not into the top alert bar as plain expiry urgency. The single
+source of truth is ``app.modules.quarantine.POSITIVE_WHERE``; the only path
+that still sees isolated rows is the expire-sweep, which finalizes them off
+the shelf (and races with clean-confirm to exactly one status).
+"""
+
+from app.modules.quarantine import POSITIVE_WHERE
+
+
 def consume_where() -> str:
-    return "status='on_shelf'"
+    """FEFO candidates: positive zone only — quarantined lots are unreachable."""
+    return POSITIVE_WHERE
+
 
 def fridge_where() -> str:
-    return "status='on_shelf' AND data_quality!='dirty' AND qty_remain>0"
+    """Fridge layers show the positive zone only."""
+    return POSITIVE_WHERE
+
 
 def alerts_where() -> str:
-    return "status='on_shelf' AND qty_remain>0 AND expiry IS NOT NULL"
+    """Top bar: normal expiry urgency over the positive zone only."""
+    return POSITIVE_WHERE + " AND expiry IS NOT NULL"
+
 
 def sweep_where() -> str:
+    """Expire-sweep finalizes every on-shelf lot with remaining qty, dirty
+    included — it is the removal path that also collects isolated rows."""
     return "status='on_shelf' AND qty_remain>0"
+
 
 def tag_fridge(rows: list) -> list:
     out = []
@@ -18,33 +40,17 @@ def tag_fridge(rows: list) -> list:
         out.append(d)
     return out
 
+
 def consume_includes_isolated(lot: dict) -> bool:
-    return str(lot.get("status") or "") == "on_shelf"
+    """Whether FEFO would deduct from this lot. Mirrors ``consume_where``:
+    isolated (dirty / non-positive) lots are never candidates."""
+    return (
+        str(lot.get("status") or "") == "on_shelf"
+        and str(lot.get("data_quality") or "clean") != "dirty"
+        and float(lot.get("qty_remain") or 0) > 0
+    )
+
 
 def alerts_treat_dirty_as_plain(lot: dict) -> bool:
-    return str(lot.get("data_quality") or "") == "dirty"
-
-
-def _copy_lot(lot: dict) -> dict:
-    return dict(lot)
-
-def _qty(lot: dict) -> float:
-    return float(lot.get("qty_remain") or 0)
-
-def _lot_id(lot: dict) -> int:
-    return int(lot.get("id") or 0)
-
-def _on_shelf(lot: dict) -> bool:
-    return str(lot.get("status") or "") == "on_shelf"
-
-def _is_clean(lot: dict) -> bool:
-    return str(lot.get("data_quality") or "clean") == "clean"
-
-def _filter_shelf(rows: list) -> list:
-    return [r for r in rows if _on_shelf(r)]
-
-def _sum_remain(rows: list) -> float:
-    return sum(_qty(r) for r in rows)
-
-def _index_by_id(rows: list) -> dict:
-    return {_lot_id(r): r for r in rows if r.get("id") is not None}
+    """Isolated lots never surface in the top bar as plain expiry urgency."""
+    return False
